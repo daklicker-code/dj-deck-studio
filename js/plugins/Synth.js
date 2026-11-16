@@ -1,4 +1,5 @@
 import { PluginBase } from './PluginBase.js';
+import { drawBody, drawKnob, drawButton, drawDisplay, drawScrew, rr, lighten, darken } from '../DrawUtils.js';
 
 const NOTES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 const BLACK  = [1,3,6,8,10]; // indices that are sharps
@@ -128,20 +129,43 @@ export class Synth extends PluginBase {
   _drawScope(canvas) {
     const ctx = canvas.getContext('2d');
     const W = canvas.width, H = canvas.height;
-    ctx.fillStyle = '#0a0a12'; ctx.fillRect(0, 0, W, H);
-    // Draw a stylized waveform based on osc1Type
-    ctx.strokeStyle = '#3a9bd5'; ctx.lineWidth = 1.5;
+
+    // Screen bezel
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,180,255,0.3)'; ctx.shadowBlur = 8;
+    const bg = ctx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, '#040810'); bg.addColorStop(1, '#000608');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+
+    // Grid lines
+    ctx.strokeStyle = 'rgba(0,100,160,0.18)'; ctx.lineWidth = 0.5;
+    for (let i = 1; i < 4; i++) {
+      ctx.beginPath(); ctx.moveTo(W*i/4, 2); ctx.lineTo(W*i/4, H-2); ctx.stroke();
+    }
+    ctx.beginPath(); ctx.moveTo(2, H/2); ctx.lineTo(W-2, H/2); ctx.stroke();
+
+    // Waveform with glow
+    ctx.save();
+    ctx.shadowColor = '#00e5ff'; ctx.shadowBlur = 6;
+    ctx.strokeStyle = '#00e5ff'; ctx.lineWidth = 1.5;
     ctx.beginPath();
     for (let x = 0; x < W; x++) {
       const t = x / W * Math.PI * 4;
       let y;
-      if (this.osc1Type === 'sawtooth') y = H / 2 - ((t % (Math.PI)) / Math.PI - 0.5) * (H * 0.6);
-      else if (this.osc1Type === 'square') y = H / 2 - (Math.sin(t) > 0 ? 1 : -1) * (H * 0.3);
-      else if (this.osc1Type === 'triangle') y = H / 2 - (2 / Math.PI * Math.asin(Math.sin(t))) * (H * 0.3);
-      else y = H / 2 - Math.sin(t) * (H * 0.3);
+      if (this.osc1Type === 'sawtooth')     y = H/2 - ((t % Math.PI) / Math.PI - 0.5) * (H * 0.65);
+      else if (this.osc1Type === 'square')  y = H/2 - (Math.sin(t) > 0 ? 1 : -1) * (H * 0.33);
+      else if (this.osc1Type === 'triangle')y = H/2 - (2/Math.PI * Math.asin(Math.sin(t))) * (H * 0.33);
+      else                                  y = H/2 - Math.sin(t) * (H * 0.33);
       x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
     }
     ctx.stroke();
+    ctx.restore();
+
+    // Screen reflection
+    const ref = ctx.createLinearGradient(0, 0, W*.4, H*.5);
+    ref.addColorStop(0, 'rgba(255,255,255,0.04)'); ref.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = ref; ctx.fillRect(0, 0, W, H);
   }
 
   _buildMiniKeys(container) {
@@ -347,21 +371,37 @@ export class Synth extends PluginBase {
 
   static drawPreview(ctx) {
     const { width: W, height: H } = ctx.canvas;
-    ctx.fillStyle = '#111118'; ctx.fillRect(0, 0, W, H);
-    // keyboard
-    const whites = 7, wW = W / whites;
-    for (let i = 0; i < whites; i++) {
-      ctx.fillStyle = '#d0d0c0'; ctx.fillRect(i * wW + 1, H * 0.3, wW - 2, H * 0.65);
-    }
-    const bpos = [0.6,1.5,3.6,4.5,5.4];
-    bpos.forEach(p => { ctx.fillStyle = '#1a1a1a'; ctx.fillRect(p * wW, H * 0.3, wW * 0.65, H * 0.4); });
-    // wave
-    ctx.strokeStyle = '#3a9bd5'; ctx.lineWidth = 1;
+    drawBody(ctx, 0, 0, W, H, 0, '#111118');
+    // scope area
+    const scopeH = H * 0.28;
+    const sbg = ctx.createLinearGradient(0, 0, 0, scopeH);
+    sbg.addColorStop(0, '#040810'); sbg.addColorStop(1, '#000608');
+    ctx.fillStyle = sbg; rr(ctx, 4, 4, W-8, scopeH-4, 2); ctx.fill();
+    ctx.save();
+    ctx.shadowColor = '#00e5ff'; ctx.shadowBlur = 4;
+    ctx.strokeStyle = '#00e5ff'; ctx.lineWidth = 1.2;
     ctx.beginPath();
-    for (let x = 0; x < W; x++) {
-      const y = H * 0.15 - Math.sin(x / W * Math.PI * 4) * H * 0.1;
-      x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    for (let x = 4; x < W-4; x++) {
+      const t = (x-4) / (W-8) * Math.PI * 4;
+      const y = scopeH/2 - Math.sin(t) * (scopeH * 0.3);
+      x === 4 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
     }
     ctx.stroke();
+    ctx.restore();
+    // keyboard
+    const kbY = scopeH, kbH = H - scopeH;
+    const whites = 7, wW = W / whites;
+    for (let i = 0; i < whites; i++) {
+      const kg = ctx.createLinearGradient(0, kbY, 0, H);
+      kg.addColorStop(0, '#e8e8d8'); kg.addColorStop(1, '#c8c8b8');
+      ctx.fillStyle = kg; rr(ctx, i*wW+1, kbY+2, wW-2, kbH-4, 1); ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 0.5; ctx.stroke();
+    }
+    const bpos = [0.6,1.5,3.6,4.5,5.4];
+    bpos.forEach(p => {
+      const bg2 = ctx.createLinearGradient(0, kbY, 0, kbY + kbH*0.65);
+      bg2.addColorStop(0, '#252525'); bg2.addColorStop(1, '#0a0a0a');
+      ctx.fillStyle = bg2; rr(ctx, p*wW+1, kbY+2, wW*0.65-1, kbH*0.6, 1); ctx.fill();
+    });
   }
 }

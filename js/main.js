@@ -9,6 +9,10 @@ import { Turntable }    from './plugins/Turntable.js';
 import { Mixer }        from './plugins/Mixer.js';
 import { DrumPad }      from './plugins/DrumPad.js';
 import { Synth }        from './plugins/Synth.js';
+import { CDJ }          from './plugins/CDJ.js';
+import { FXUnit }       from './plugins/FXUnit.js';
+import { SamplerPad }   from './plugins/SamplerPad.js';
+import { BeatMachine }  from './plugins/BeatMachine.js';
 
 /* ── Globals ── */
 const ae  = new AudioEngine();
@@ -19,6 +23,10 @@ dm.register(Turntable);
 dm.register(Mixer);
 dm.register(DrumPad);
 dm.register(Synth);
+dm.register(CDJ);
+dm.register(FXUnit);
+dm.register(SamplerPad);
+dm.register(BeatMachine);
 
 /* ── Header: BPM controls ── */
 const bpmInput   = document.getElementById('master-bpm');
@@ -102,5 +110,5 @@ document.addEventListener('keydown', () => ae.start(), { once: true });
 dm.restoreSaved();
 
 /* ── Show version in console ── */
-console.log('%cDJ Deck Studio v0.1', 'color:#3a9bd5;font-size:16px;font-weight:bold;');
-console.log('%cOpen the device picker (+) to add your first device.', 'color:#888;');
+console.log('%cDJ Deck Studio v0.2', 'color:#3a9bd5;font-size:16px;font-weight:bold;');
+console.log('%c8 devices: Turntable, Mixer, DrumPad, Synth, CDJ, FX Unit, Sampler Pad, Beat Machine', 'color:#888;');

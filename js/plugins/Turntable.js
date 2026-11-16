@@ -1,4 +1,5 @@
 import { PluginBase } from './PluginBase.js';
+import { drawBody, drawButton, drawLED, drawScrew, drawFaderV, aluminumGrad, chromeGrad, lighten, darken, rr } from '../DrawUtils.js';
 
 export class Turntable extends PluginBase {
   constructor(id, cfg = {}) {
@@ -41,152 +42,211 @@ export class Turntable extends PluginBase {
   _draw(canvas) {
     const ctx = canvas.getContext('2d');
     const W = canvas.width, H = canvas.height;
+    const scale = W / 230; // normalize to design size
 
     ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = '#0f0f1a';
-    ctx.fillRect(0, 0, W, H);
-    ctx.strokeStyle = '#1e1e2e';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(1, 1, W - 2, H - 2);
+
+    // Body
+    drawBody(ctx, 0, 0, W, H, 0, '#161620');
+
+    // Subtle surface texture lines (brushed aluminum strip, top)
+    for (let i = 0; i < 3; i++) {
+      ctx.strokeStyle = `rgba(255,255,255,${0.015 - i * 0.004})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(0, 2 + i*1.5); ctx.lineTo(W, 2 + i*1.5); ctx.stroke();
+    }
 
     const cx = W * 0.44, cy = H * 0.5, R = Math.min(W, H) * 0.38;
 
-    // Platter shadow
-    ctx.fillStyle = '#080810';
-    ctx.beginPath(); ctx.arc(cx + 2, cy + 3, R + 5, 0, Math.PI * 2); ctx.fill();
+    // Platter well (recessed area)
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 2;
+    ctx.fillStyle = '#0a0a12';
+    ctx.beginPath(); ctx.arc(cx, cy, R + 5*scale, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
 
-    // Platter
-    const pg = ctx.createRadialGradient(cx - R * .2, cy - R * .2, R * .05, cx, cy, R);
-    pg.addColorStop(0, '#6a6a7a'); pg.addColorStop(.4, '#4a4a5a'); pg.addColorStop(1, '#252535');
-    ctx.fillStyle = pg;
-    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
+    // Chrome platter ring
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 8;
+    ctx.fillStyle = chromeGrad(ctx, cx, cy, R * 0.85, R + 4*scale);
+    ctx.beginPath(); ctx.arc(cx, cy, R + 4*scale, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+
+    // Rubber mat (dark charcoal circle on platter)
+    const matG = ctx.createRadialGradient(cx - R*.12, cy - R*.15, R*.1, cx, cy, R*.92);
+    matG.addColorStop(0, '#252530'); matG.addColorStop(.6, '#1a1a22'); matG.addColorStop(1, '#111118');
+    ctx.fillStyle = matG;
+    ctx.beginPath(); ctx.arc(cx, cy, R * .92, 0, Math.PI*2); ctx.fill();
 
     // Spinning record group
     ctx.save();
     ctx.translate(cx, cy); ctx.rotate(this.angle); ctx.translate(-cx, -cy);
 
-    const rr = R * 0.88;
-    const rg = ctx.createRadialGradient(cx, cy, 0, cx, cy, rr);
-    rg.addColorStop(0, '#252535'); rg.addColorStop(1, '#0e0e1a');
-    ctx.fillStyle = rg;
-    ctx.beginPath(); ctx.arc(cx, cy, rr, 0, Math.PI * 2); ctx.fill();
+    const vR = R * 0.88;
+    // Vinyl — slightly reflective black
+    const vg = ctx.createRadialGradient(cx - vR*.08, cy - vR*.1, vR*.05, cx, cy, vR);
+    vg.addColorStop(0,   '#1e1e28');
+    vg.addColorStop(0.3, '#0e0e18');
+    vg.addColorStop(0.7, '#131320');
+    vg.addColorStop(1,   '#0a0a14');
+    ctx.fillStyle = vg;
+    ctx.beginPath(); ctx.arc(cx, cy, vR, 0, Math.PI*2); ctx.fill();
 
-    // Vinyl grooves
-    for (let i = 3; i < 28; i++) {
-      const gr = rr * (.2 + i * .029);
-      if (gr > rr * .97) break;
-      ctx.strokeStyle = `rgba(55,55,70,${0.7 - i * .02})`;
-      ctx.lineWidth = .6;
-      ctx.beginPath(); ctx.arc(cx, cy, gr, 0, Math.PI * 2); ctx.stroke();
+    // Vinyl grooves — many fine rings
+    for (let i = 0; i < 42; i++) {
+      const gr = vR * (0.17 + i * 0.0195);
+      if (gr > vR * 0.97) break;
+      const opacity = 0.55 - i * 0.008;
+      ctx.strokeStyle = `rgba(80,80,100,${Math.max(0.08, opacity)})`;
+      ctx.lineWidth = i % 4 === 0 ? 0.9 : 0.4;
+      ctx.beginPath(); ctx.arc(cx, cy, gr, 0, Math.PI*2); ctx.stroke();
     }
 
     // Label disc
-    const lR = rr * .3;
-    const lg = ctx.createRadialGradient(cx - lR * .3, cy - lR * .3, 2, cx, cy, lR);
-    lg.addColorStop(0, this.config.labelColor);
-    lg.addColorStop(1, this._darken(this.config.labelColor));
+    const lR = vR * .28;
+    const lg = ctx.createRadialGradient(cx - lR*.3, cy - lR*.35, lR*.05, cx, cy, lR);
+    lg.addColorStop(0, lighten(this.config.labelColor, 0.2));
+    lg.addColorStop(0.4, this.config.labelColor);
+    lg.addColorStop(1, darken(this.config.labelColor, 0.3));
     ctx.fillStyle = lg;
-    ctx.beginPath(); ctx.arc(cx, cy, lR, 0, Math.PI * 2); ctx.fill();
-
+    ctx.beginPath(); ctx.arc(cx, cy, lR, 0, Math.PI*2); ctx.fill();
+    // label ring highlight
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.arc(cx, cy, lR, 0, Math.PI*2); ctx.stroke();
+    // label text
     const fs = Math.max(6, lR * 0.19);
-    ctx.fillStyle = 'rgba(255,255,255,.7)';
-    ctx.font = `bold ${fs}px monospace`;
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.font = `bold ${fs}px 'Courier New', monospace`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    const dname = this.sampleName.length > 10 ? this.sampleName.slice(0, 10) + '…' : this.sampleName;
-    ctx.fillText(dname, cx, cy - lR * .12);
-    ctx.font = `${Math.max(5, lR * 0.15)}px monospace`;
-    ctx.fillStyle = 'rgba(255,255,255,.4)';
-    ctx.fillText(`${this.rpm} RPM`, cx, cy + lR * .32);
+    const dn = this.sampleName.length > 9 ? this.sampleName.slice(0, 9) + '…' : this.sampleName;
+    ctx.fillText(dn, cx, cy - lR*.1);
+    ctx.font = `${Math.max(4.5, lR*0.145)}px 'Courier New', monospace`;
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.fillText(`${this.rpm} RPM`, cx, cy + lR*.32);
 
-    // Spindle
-    ctx.fillStyle = '#ccc';
-    ctx.beginPath(); ctx.arc(cx, cy, 3.5, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#777';
-    ctx.beginPath(); ctx.arc(cx, cy, 1.5, 0, Math.PI * 2); ctx.fill();
+    // Spindle (chrome peg)
+    const spG = ctx.createRadialGradient(cx-2*scale, cy-2*scale, 0, cx, cy, 4*scale);
+    spG.addColorStop(0, '#e8e8f0'); spG.addColorStop(0.4, '#a0a0b0'); spG.addColorStop(1, '#404050');
+    ctx.fillStyle = spG;
+    ctx.beginPath(); ctx.arc(cx, cy, 4*scale, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#1a1a28';
+    ctx.beginPath(); ctx.arc(cx, cy, 1.5*scale, 0, Math.PI*2); ctx.fill();
 
-    ctx.restore();
+    ctx.restore(); // end spinning group
 
     // Tonearm
-    this._drawArm(ctx, cx, cy, R, W, H);
-
-    // Controls overlay
-    this._drawOverlay(ctx, W, H);
+    this._drawArm(ctx, cx, cy, R, W, H, scale);
+    // Controls
+    this._drawOverlay(ctx, W, H, scale);
   }
 
-  _drawArm(ctx, cx, cy, R, W, H) {
-    const pivX = cx + R * 1.08, pivY = cy + R * .28;
-    const armAng = -Math.PI * 0.72;
-    const armLen = R * 0.9;
+  _drawArm(ctx, cx, cy, R, W, H, scale = 1) {
+    const pivX = cx + R * 1.1, pivY = cy + R * .32;
+    const armAng = -Math.PI * 0.7;
+    const armLen = R * 0.86;
     const ex = pivX + Math.cos(armAng) * armLen;
     const ey = pivY + Math.sin(armAng) * armLen;
 
-    // Shadow
-    ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.lineWidth = 4; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(pivX + 1, pivY + 2); ctx.lineTo(ex + 1, ey + 2); ctx.stroke();
-
-    // Arm
-    const ag = ctx.createLinearGradient(pivX, pivY, ex, ey);
-    ag.addColorStop(0, '#5a5a6a'); ag.addColorStop(1, '#3a3a4a');
-    ctx.strokeStyle = ag; ctx.lineWidth = 2.5;
-    ctx.beginPath(); ctx.moveTo(pivX, pivY); ctx.lineTo(ex, ey); ctx.stroke();
-
-    // Headshell
-    ctx.save(); ctx.translate(ex, ey); ctx.rotate(armAng + .3);
-    ctx.fillStyle = '#4a4a5a'; ctx.fillRect(-2, -5, 7, 10);
-    ctx.fillStyle = '#6a6a7a'; ctx.fillRect(-1, -4, 5, 4);
+    // Arm shadow
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.75)'; ctx.shadowBlur = 5; ctx.shadowOffsetY = 2;
+    ctx.strokeStyle = 'rgba(0,0,0,0.0)'; // shadow only via fillStyle trick
+    ctx.lineWidth = 4*scale; ctx.lineCap = 'round';
+    ctx.strokeStyle = '#080810';
+    ctx.beginPath(); ctx.moveTo(pivX+1, pivY+2); ctx.lineTo(ex+1, ey+2); ctx.stroke();
     ctx.restore();
 
-    // Pivot
-    const pivG = ctx.createRadialGradient(pivX - 2, pivY - 2, 1, pivX, pivY, 8);
-    pivG.addColorStop(0, '#7a7a8a'); pivG.addColorStop(1, '#252535');
+    // Arm tube — metallic gradient along the arm
+    const ag = ctx.createLinearGradient(pivX, pivY, ex, ey);
+    ag.addColorStop(0, '#7a7a8c'); ag.addColorStop(0.4, '#5a5a6e'); ag.addColorStop(1, '#3c3c50');
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 3;
+    ctx.strokeStyle = ag; ctx.lineWidth = 3*scale; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(pivX, pivY); ctx.lineTo(ex, ey); ctx.stroke();
+    // Specular highlight on arm
+    ctx.strokeStyle = 'rgba(255,255,255,0.14)'; ctx.lineWidth = 1*scale;
+    ctx.beginPath(); ctx.moveTo(pivX-0.5, pivY-0.5); ctx.lineTo(ex-0.5, ey-0.5); ctx.stroke();
+    ctx.restore();
+
+    // Headshell
+    ctx.save();
+    ctx.translate(ex, ey); ctx.rotate(armAng + 0.3);
+    const hg = ctx.createLinearGradient(-2, -6, 6, 6);
+    hg.addColorStop(0, '#6a6a7c'); hg.addColorStop(1, '#38384a');
+    ctx.fillStyle = hg; rr(ctx, -2.5, -5.5*scale, 8*scale, 11*scale, 1); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 0.5; ctx.stroke();
+    // Stylus tip
+    ctx.fillStyle = '#a8a8c0';
+    ctx.beginPath(); ctx.arc(2.5*scale, 4*scale, 1.5*scale, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+
+    // Pivot housing
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.65)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 1;
+    const pivRad = 7*scale;
+    const pivG = ctx.createRadialGradient(pivX-pivRad*.3, pivY-pivRad*.3, 0, pivX, pivY, pivRad);
+    pivG.addColorStop(0, '#8a8a9e'); pivG.addColorStop(0.5, '#5a5a6e'); pivG.addColorStop(1, '#252535');
     ctx.fillStyle = pivG;
-    ctx.beginPath(); ctx.arc(pivX, pivY, 8, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = '#4a4a5a'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.beginPath(); ctx.arc(pivX, pivY, pivRad, 0, Math.PI*2); ctx.fill();
+    ctx.shadowColor = 'transparent';
+    ctx.strokeStyle = 'rgba(255,255,255,0.14)'; ctx.lineWidth = 0.6;
+    ctx.beginPath(); ctx.arc(pivX, pivY, pivRad, 0, Math.PI*2); ctx.stroke();
+    // center dot
+    ctx.fillStyle = '#1a1a26';
+    ctx.beginPath(); ctx.arc(pivX, pivY, 2.5*scale, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
 
     // Counterweight
-    const cwX = pivX + Math.cos(armAng + Math.PI) * 14;
-    const cwY = pivY + Math.sin(armAng + Math.PI) * 14;
-    ctx.fillStyle = '#5a5a6a';
-    ctx.beginPath(); ctx.arc(cwX, cwY, 5, 0, Math.PI * 2); ctx.fill();
+    const cwLen = 15*scale;
+    const cwX = pivX + Math.cos(armAng + Math.PI) * cwLen;
+    const cwY = pivY + Math.sin(armAng + Math.PI) * cwLen;
+    const cwR = 5*scale;
+    ctx.save();
+    const cwG = ctx.createRadialGradient(cwX-cwR*.3, cwY-cwR*.3, 0, cwX, cwY, cwR);
+    cwG.addColorStop(0, '#7a7a8c'); cwG.addColorStop(1, '#282835');
+    ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 4;
+    ctx.fillStyle = cwG;
+    ctx.beginPath(); ctx.arc(cwX, cwY, cwR, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
 
-    // Pitch slider on right edge
-    const sX = W - 14, sTop = H * .15, sH = H * .62;
-    ctx.fillStyle = '#0a0a16';
-    ctx.fillRect(sX - 2, sTop, 4, sH);
-    ctx.strokeStyle = '#252538'; ctx.lineWidth = 1;
-    ctx.strokeRect(sX - 2, sTop, 4, sH);
-
-    const mid = sTop + sH / 2;
-    ctx.strokeStyle = '#3a9bd5'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(sX - 5, mid); ctx.lineTo(sX + 2, mid); ctx.stroke();
-
-    const norm = (this.pitch + 8) / 16;
-    const tY = sTop + (1 - norm) * sH;
-    ctx.fillStyle = '#5a5a6a';
-    ctx.fillRect(sX - 5, tY - 4, 10, 8);
-    ctx.strokeStyle = '#8a8a9a'; ctx.lineWidth = 1;
-    ctx.strokeRect(sX - 5, tY - 4, 10, 8);
-
-    ctx.fillStyle = '#5a5a7a'; ctx.font = '7px monospace'; ctx.textAlign = 'center';
-    ctx.fillText(`${this.pitch >= 0 ? '+' : ''}${this.pitch.toFixed(1)}%`, sX, sTop - 3);
+    // Pitch slider (right side)
+    const sX = W - 11*scale, sTop = H * .18, sH = H * .58;
+    drawFaderV(ctx, sX - 5*scale, sTop, 11*scale, sH, (this.pitch + 8) / 16);
+    // pitch label
+    ctx.fillStyle = 'rgba(170,170,190,0.65)';
+    ctx.font = `${6.5*scale}px 'Courier New', monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText(`${this.pitch >= 0 ? '+' : ''}${this.pitch.toFixed(1)}%`, sX, sTop - 5*scale);
+    ctx.fillText('PITCH', sX, sTop + sH + 9*scale);
   }
 
-  _drawOverlay(ctx, W, H) {
-    // Power LED
-    ctx.fillStyle = this.isPlaying ? '#00ff44' : '#003300';
-    if (this.isPlaying) { ctx.shadowColor = '#00ff44'; ctx.shadowBlur = 7; }
-    ctx.beginPath(); ctx.arc(W - 11, 11, 4, 0, Math.PI * 2); ctx.fill();
-    ctx.shadowBlur = 0;
+  _drawOverlay(ctx, W, H, scale = 1) {
+    // Corner screws
+    [[5,5],[W-5,5],[5,H-5],[W-5,H-5]].forEach(([x,y]) => drawScrew(ctx, x, y, 3*scale));
 
-    // 33/45 buttons
-    const bx = 8, by = H - 18;
+    // Power LED (top-right)
+    drawLED(ctx, W - 10*scale, 9*scale, 4*scale, { lit: this.isPlaying, color: '#00ff44' });
+
+    // 33/45 RPM buttons (bottom-left)
+    const bx = 8*scale, by = H - 20*scale;
     [[33.3, '33'], [45, '45']].forEach(([v, t], i) => {
-      ctx.fillStyle = this.rpm === v ? '#3a9bd5' : '#1a1a2a';
-      ctx.fillRect(bx + i * 24, by, 20, 12);
-      ctx.fillStyle = this.rpm === v ? '#fff' : '#5a5a6a';
-      ctx.font = '7px monospace'; ctx.textAlign = 'center';
-      ctx.fillText(t, bx + i * 24 + 10, by + 9);
+      drawButton(ctx, bx + i*26*scale, by, 22*scale, 14*scale, {
+        label: t, lit: this.rpm === v, litColor: '#3a9bd5', r: 2, fontSize: 7*scale
+      });
     });
+
+    // "TECHNICS" brand text (bottom center)
+    ctx.fillStyle = 'rgba(255,255,255,0.18)';
+    ctx.font = `bold ${7*scale}px 'Courier New', monospace`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('TECHNICS  SL-1210', W * 0.5, H - 8*scale);
+
+    // "REV" indicator if reversed
+    if (this.isReversed) {
+      ctx.fillStyle = 'rgba(255,100,0,0.8)';
+      ctx.font = `bold ${7*scale}px 'Courier New', monospace`;
+      ctx.fillText('⟵ REV', W * 0.5, 9*scale);
+    }
   }
 
   _darken(hex) {
@@ -434,13 +494,38 @@ export class Turntable extends PluginBase {
 
   static drawPreview(ctx) {
     const { width: W, height: H } = ctx.canvas;
-    ctx.fillStyle = '#0f0f1a'; ctx.fillRect(0, 0, W, H);
+    drawBody(ctx, 0, 0, W, H, 0, '#161620');
     const cx = W * .44, cy = H * .5, R = Math.min(W, H) * .38;
-    ctx.fillStyle = '#3a3a4a'; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#1a1a2a'; ctx.beginPath(); ctx.arc(cx, cy, R * .88, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#c02020'; ctx.beginPath(); ctx.arc(cx, cy, R * .3, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#ccc'; ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = '#5a5a6a'; ctx.lineWidth = 2; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(cx + R * 1.1, cy + R * .3); ctx.lineTo(cx + R * .1, cy - R * .4); ctx.stroke();
+    // platter well
+    ctx.fillStyle = '#0a0a12';
+    ctx.beginPath(); ctx.arc(cx, cy, R + 4, 0, Math.PI*2); ctx.fill();
+    // chrome ring
+    ctx.fillStyle = chromeGrad(ctx, cx, cy, R * 0.85, R + 4);
+    ctx.beginPath(); ctx.arc(cx, cy, R + 4, 0, Math.PI*2); ctx.fill();
+    // vinyl
+    const vg = ctx.createRadialGradient(cx - R*.08, cy - R*.1, R*.05, cx, cy, R*.92);
+    vg.addColorStop(0, '#1e1e28'); vg.addColorStop(0.5, '#0e0e18'); vg.addColorStop(1, '#0a0a14');
+    ctx.fillStyle = vg; ctx.beginPath(); ctx.arc(cx, cy, R*.92, 0, Math.PI*2); ctx.fill();
+    // grooves
+    for (let i = 3; i < 20; i++) {
+      const gr = R * .92 * (0.2 + i * 0.038);
+      if (gr > R * .88) break;
+      ctx.strokeStyle = `rgba(80,80,100,${0.4 - i*0.015})`; ctx.lineWidth = 0.5;
+      ctx.beginPath(); ctx.arc(cx, cy, gr, 0, Math.PI*2); ctx.stroke();
+    }
+    // label disc
+    const lR = R * .28;
+    const lg = ctx.createRadialGradient(cx - lR*.3, cy - lR*.3, 0, cx, cy, lR);
+    lg.addColorStop(0, '#d03030'); lg.addColorStop(1, '#7a1010');
+    ctx.fillStyle = lg; ctx.beginPath(); ctx.arc(cx, cy, lR, 0, Math.PI*2); ctx.fill();
+    // spindle
+    ctx.fillStyle = '#c0c0cc'; ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI*2); ctx.fill();
+    // tonearm
+    const ag = ctx.createLinearGradient(cx + R*1.1, cy + R*.3, cx + R*.1, cy - R*.4);
+    ag.addColorStop(0, '#6a6a7c'); ag.addColorStop(1, '#3c3c50');
+    ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 4;
+    ctx.strokeStyle = ag; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(cx + R*1.1, cy + R*.3); ctx.lineTo(cx + R*.1, cy - R*.4); ctx.stroke();
+    ctx.restore();
   }
 }
